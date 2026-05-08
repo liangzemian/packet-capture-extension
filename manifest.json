@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "抓包归档",
+  "version": "1.0.0",
+  "description": "HTTP 请求抓包与归档工具，支持完整的请求/响应捕获、过滤和多格式导出",
+  "permissions": [
+    "debugger",
+    "storage",
+    "tabs",
+    "activeTab",
+    "alarms",
+    "downloads"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "抓包归档"
+  }
+}

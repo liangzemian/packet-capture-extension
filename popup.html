@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>抓包归档</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-row">
+      <h1>抓包归档</h1>
+      <span class="status-badge" id="statusBadge">未启动</span>
+    </div>
+    <div class="header-actions">
+      <button id="captureBtn" class="btn btn-primary">开始抓包</button>
+      <button id="exportHarBtn" class="btn btn-secondary" disabled>导出 HAR</button>
+      <button id="exportJsonBtn" class="btn btn-secondary" disabled>导出 JSON</button>
+      <button id="clearBtn" class="btn btn-danger" disabled>清空</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="capture">实时抓包</button>
+    <button class="tab" data-tab="archive">历史归档</button>
+  </div>
+
+  <!-- Capture Tab -->
+  <div class="tab-content active" id="captureTab">
+    <div class="filter-bar">
+      <input type="text" id="searchInput" placeholder="搜索 URL...">
+      <select id="methodFilter">
+        <option value="">全部方法</option>
+        <option value="GET">GET</option>
+        <option value="POST">POST</option>
+        <option value="PUT">PUT</option>
+        <option value="DELETE">DELETE</option>
+        <option value="PATCH">PATCH</option>
+      </select>
+      <select id="statusFilter">
+        <option value="">全部状态</option>
+        <option value="2">2xx</option>
+        <option value="3">3xx</option>
+        <option value="4">4xx</option>
+        <option value="5">5xx</option>
+      </select>
+    </div>
+    <div class="request-count" id="requestCount">共 0 条请求</div>
+    <div class="request-list" id="requestList">
+      <div class="empty-state">暂无数据，点击「开始抓包」捕获请求</div>
+    </div>
+  </div>
+
+  <!-- Archive Tab -->
+  <div class="tab-content" id="archiveTab">
+    <div class="archive-list" id="archiveList">
+      <div class="empty-state">暂无归档记录</div>
+    </div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <h2 id="detailTitle">请求详情</h2>
+      <button id="closeDetailBtn" class="btn-close">&times;</button>
+    </div>
+    <div class="detail-content" id="detailContent"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

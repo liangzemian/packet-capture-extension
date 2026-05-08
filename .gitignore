@@ -1,0 +1,13 @@
+# Test data (large capture files with sensitive info)
+test/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Dependencies (if added later)
+node_modules/
