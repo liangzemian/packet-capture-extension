@@ -2,12 +2,27 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>抓包归档</title>
+  <style>
+    html, body, #appShell {
+      width: 800px;
+      height: 600px;
+      min-width: 800px;
+      min-height: 600px;
+      margin: 0;
+      overflow: hidden;
+    }
+    #appShell {
+      display: flex;
+      flex-direction: column;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
+  </style>
   <link rel="stylesheet" href="popup.css">
 </head>
-<body>
-  <div id="appShell" class="app-shell">
+<body style="width:800px;height:600px;min-width:800px;min-height:600px;margin:0;overflow:hidden;">
+  <div id="appShell" class="app-shell" style="width:800px;height:600px;min-width:800px;min-height:600px;">
   <!-- Header -->
   <div class="header">
     <div class="header-row">
@@ -133,10 +148,10 @@
   </div>
   </div>
 
-  <button class="popup-resize-handle popup-resize-tl" data-corner="tl" title="拖拽缩放窗口" aria-label="拖拽缩放窗口"></button>
-  <button class="popup-resize-handle popup-resize-tr" data-corner="tr" title="拖拽缩放窗口" aria-label="拖拽缩放窗口"></button>
-  <button class="popup-resize-handle popup-resize-bl" data-corner="bl" title="拖拽缩放窗口" aria-label="拖拽缩放窗口"></button>
-  <button class="popup-resize-handle popup-resize-br" data-corner="br" title="拖拽缩放窗口" aria-label="拖拽缩放窗口"></button>
+  <div class="popup-resize-handle popup-resize-tl" data-corner="tl" title="拖拽缩放窗口" aria-label="拖拽缩放窗口" role="button"></div>
+  <div class="popup-resize-handle popup-resize-tr" data-corner="tr" title="拖拽缩放窗口" aria-label="拖拽缩放窗口" role="button"></div>
+  <div class="popup-resize-handle popup-resize-bl" data-corner="bl" title="拖拽缩放窗口" aria-label="拖拽缩放窗口" role="button"></div>
+  <div class="popup-resize-handle popup-resize-br" data-corner="br" title="拖拽缩放窗口" aria-label="拖拽缩放窗口" role="button"></div>
 
   <script src="popup.js"></script>
 </body>
