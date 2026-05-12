@@ -2,6 +2,7 @@
 const $ = (id) => document.getElementById(id);
 
 const captureBtn = $('captureBtn');
+const aiAnalyzeBtn = $('aiAnalyzeBtn');
 const exportHarBtn = $('exportHarBtn');
 const exportJsonBtn = $('exportJsonBtn');
 const clearBtn = $('clearBtn');
@@ -16,6 +17,22 @@ const detailContent = $('detailContent');
 const detailTitle = $('detailTitle');
 const closeDetailBtn = $('closeDetailBtn');
 const archiveList = $('archiveList');
+const aiProvider = $('aiProvider');
+const aiBaseUrl = $('aiBaseUrl');
+const aiModelsBaseUrl = $('aiModelsBaseUrl');
+const aiApiKey = $('aiApiKey');
+const aiModel = $('aiModel');
+const aiCustomModelRow = $('aiCustomModelRow');
+const aiCustomModel = $('aiCustomModel');
+const aiIncludeBodies = $('aiIncludeBodies');
+const aiRedactSensitive = $('aiRedactSensitive');
+const aiMaxRequests = $('aiMaxRequests');
+const aiSaveBtn = $('aiSaveBtn');
+const aiLoadModelsBtn = $('aiLoadModelsBtn');
+const aiRunBtn = $('aiRunBtn');
+const aiCopyBtn = $('aiCopyBtn');
+const aiStatus = $('aiStatus');
+const aiResult = $('aiResult');
 
 let capturing = false;
 let currentTabId = null;
@@ -24,6 +41,19 @@ let selectedSessionId = null;
 let selectedReqId = null;
 let allRequests = [];
 let refreshTimer = null;
+let aiLoading = false;
+let latestAIAnalysis = '';
+
+const AI_CONFIG_KEY = 'aiConfig';
+const AI_DEFAULT_BASE_URL = {
+  openai: 'https://api.openai.com',
+  anthropic: 'https://api.anthropic.com'
+};
+const AI_MODEL_PLACEHOLDER = {
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-3-5-sonnet-latest'
+};
+const AI_CUSTOM_MODEL_VALUE = '__custom__';
 
 // === Init ===
 async function init() {
@@ -38,9 +68,11 @@ async function init() {
       tabEl.classList.add('active');
       $(tabEl.dataset.tab + 'Tab').classList.add('active');
       if (tabEl.dataset.tab === 'archive') loadArchives();
+      if (tabEl.dataset.tab === 'ai') updateAIButtons();
     });
   });
 
+  await loadAIConfig();
   await refreshStatus();
   await refreshRequests();
   startAutoRefresh();
@@ -78,6 +110,7 @@ function updateUI() {
   exportHarBtn.disabled = allRequests.length === 0;
   exportJsonBtn.disabled = allRequests.length === 0;
   clearBtn.disabled = allRequests.length === 0;
+  updateAIButtons();
 }
 
 // === Requests ===
@@ -137,7 +170,10 @@ async function showDetail(id) {
   detailTitle.textContent = `${r.method} ${r.status || '...'}`;
   detailPanel.classList.add('visible');
 
-  let html = `<div class="detail-section"><h3>General</h3>
+  let html = `<div class="detail-actions">
+      <button class="btn btn-ai btn-sm" id="analyzeRequestBtn" data-id="${r.id}">AI分析此请求</button>
+    </div>
+    <div class="detail-section"><h3>General</h3>
     <dl class="detail-meta">
       <dt>URL</dt><dd>${esc(r.url)}</dd>
       <dt>Method</dt><dd>${r.method}</dd>
@@ -164,6 +200,7 @@ async function showDetail(id) {
   }
 
   detailContent.innerHTML = html;
+  $('analyzeRequestBtn')?.addEventListener('click', () => runAIAnalysisForRequest(r.id));
 }
 
 // === Archives ===
@@ -253,6 +290,41 @@ clearBtn.addEventListener('click', async () => {
   await refreshRequests();
 });
 
+aiAnalyzeBtn.addEventListener('click', async () => {
+  document.querySelector('.tab[data-tab="ai"]').click();
+  await runAIAnalysis();
+});
+
+aiRunBtn.addEventListener('click', runAIAnalysis);
+aiSaveBtn.addEventListener('click', async () => {
+  await saveAIConfig();
+  setAIStatus('配置已保存', 'ok');
+});
+aiLoadModelsBtn.addEventListener('click', loadAIModels);
+aiModel.addEventListener('change', updateCustomModelVisibility);
+aiCopyBtn.addEventListener('click', async () => {
+  if (!latestAIAnalysis) return;
+  try {
+    await navigator.clipboard.writeText(latestAIAnalysis);
+    setAIStatus('分析结果已复制', 'ok');
+  } catch {
+    setAIStatus('复制失败，请手动选择文本复制', 'err');
+  }
+});
+
+aiProvider.addEventListener('change', () => {
+  const provider = aiProvider.value;
+  const oldDefaults = Object.values(AI_DEFAULT_BASE_URL);
+  if (!aiBaseUrl.value.trim() || oldDefaults.includes(aiBaseUrl.value.trim())) {
+    aiBaseUrl.value = AI_DEFAULT_BASE_URL[provider] || '';
+  }
+  aiBaseUrl.placeholder = AI_DEFAULT_BASE_URL[provider] || '';
+  aiModelsBaseUrl.placeholder = `${AI_DEFAULT_BASE_URL[provider] || ''}/v1/models`;
+  aiApiKey.placeholder = provider === 'anthropic' ? 'sk-ant-...' : 'sk-...';
+  aiCustomModel.placeholder = AI_MODEL_PLACEHOLDER[provider] || '';
+  renderAIModelOptions([], getSelectedAIModel());
+});
+
 closeDetailBtn.addEventListener('click', () => {
   detailPanel.classList.remove('visible');
   selectedReqId = null;
@@ -275,6 +347,206 @@ function startAutoRefresh() {
 }
 function stopAutoRefresh() {
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
+
+// === AI Analysis ===
+function getSelectedAIModel() {
+  return aiModel.value === AI_CUSTOM_MODEL_VALUE
+    ? aiCustomModel.value.trim()
+    : aiModel.value.trim();
+}
+
+function updateCustomModelVisibility() {
+  const isCustom = aiModel.value === AI_CUSTOM_MODEL_VALUE;
+  aiCustomModelRow.classList.toggle('is-hidden', !isCustom);
+  if (isCustom) aiCustomModel.focus();
+}
+
+function renderAIModelOptions(models = [], selectedModel = '') {
+  const selected = (selectedModel || '').trim();
+  const seen = new Set();
+  const normalized = models
+    .map(m => ({
+      id: String(m.id || '').trim(),
+      displayName: String(m.displayName || m.id || '').trim()
+    }))
+    .filter(m => m.id && !seen.has(m.id) && seen.add(m.id));
+
+  const options = ['<option value="">请选择模型</option>'];
+  for (const m of normalized) {
+    options.push(`<option value="${esc(m.id)}">${esc(m.displayName || m.id)}</option>`);
+  }
+  if (selected && !seen.has(selected)) {
+    options.push(`<option value="${esc(selected)}">${esc(selected)}</option>`);
+  }
+  options.push(`<option value="${AI_CUSTOM_MODEL_VALUE}">自定义输入...</option>`);
+  aiModel.innerHTML = options.join('');
+
+  if (selected) {
+    aiModel.value = selected;
+  } else if (normalized[0]) {
+    aiModel.value = normalized[0].id;
+  } else {
+    aiModel.value = '';
+  }
+  updateCustomModelVisibility();
+}
+
+async function loadAIConfig() {
+  const data = await chrome.storage.local.get(AI_CONFIG_KEY);
+  const cfg = data[AI_CONFIG_KEY] || {};
+  aiProvider.value = cfg.provider || 'openai';
+  aiBaseUrl.value = cfg.baseUrl || AI_DEFAULT_BASE_URL[aiProvider.value] || '';
+  aiModelsBaseUrl.value = cfg.modelsBaseUrl || '';
+  aiApiKey.value = cfg.apiKey || '';
+  aiCustomModel.value = cfg.model || '';
+  aiIncludeBodies.checked = cfg.includeBodies !== false;
+  aiRedactSensitive.checked = cfg.redactSensitive !== false;
+  aiMaxRequests.value = cfg.maxRequests || 40;
+  aiProvider.dispatchEvent(new Event('change'));
+  renderAIModelOptions([], cfg.model || '');
+}
+
+function collectAIConfig() {
+  return {
+    provider: aiProvider.value || 'openai',
+    baseUrl: aiBaseUrl.value.trim(),
+    modelsBaseUrl: aiModelsBaseUrl.value.trim(),
+    apiKey: aiApiKey.value.trim(),
+    model: getSelectedAIModel(),
+    includeBodies: aiIncludeBodies.checked,
+    redactSensitive: aiRedactSensitive.checked,
+    maxRequests: Math.max(1, parseInt(aiMaxRequests.value, 10) || 40)
+  };
+}
+
+async function saveAIConfig() {
+  const cfg = collectAIConfig();
+  await chrome.storage.local.set({ [AI_CONFIG_KEY]: cfg });
+  return cfg;
+}
+
+function validateAIConfig(cfg) {
+  if (!cfg.apiKey) return '请先填写 API Key';
+  if (!cfg.model) return '请先填写模型名称，或点击「获取模型列表」选择模型';
+  return '';
+}
+
+function updateAIButtons() {
+  const noData = allRequests.length === 0 && !capturing;
+  aiAnalyzeBtn.disabled = noData || aiLoading;
+  aiRunBtn.disabled = noData || aiLoading;
+  aiLoadModelsBtn.disabled = aiLoading;
+  aiSaveBtn.disabled = aiLoading;
+  aiCopyBtn.disabled = !latestAIAnalysis;
+}
+
+function setAIStatus(text, type = '') {
+  aiStatus.textContent = text;
+  aiStatus.className = `ai-status ${type}`.trim();
+}
+
+async function loadAIModels() {
+  const cfg = await saveAIConfig();
+  const err = cfg.apiKey ? '' : '请先填写 API Key';
+  if (err) { setAIStatus(err, 'err'); return; }
+
+  aiLoading = true;
+  updateAIButtons();
+  setAIStatus('正在获取模型列表...', 'loading');
+  try {
+    const resp = await sendMsg({ action: 'listAIModels', config: cfg });
+    if (!resp.ok) throw new Error(resp.error || '获取模型列表失败');
+    const models = resp.models || [];
+    renderAIModelOptions(models, cfg.model);
+    await saveAIConfig();
+    const selected = getSelectedAIModel();
+    setAIStatus(`已获取 ${models.length} 个模型，当前选择：${selected || '未选择'}`, 'ok');
+  } catch (e) {
+    setAIStatus(e.message || '获取模型列表失败', 'err');
+  } finally {
+    aiLoading = false;
+    updateAIButtons();
+  }
+}
+
+async function runAIAnalysis() {
+  await refreshRequests();
+  if (allRequests.length === 0 && !capturing) {
+    setAIStatus('当前会话没有可分析的请求', 'err');
+    return;
+  }
+
+  const cfg = await saveAIConfig();
+  const err = validateAIConfig(cfg);
+  if (err) { setAIStatus(err, 'err'); return; }
+
+  aiLoading = true;
+  latestAIAnalysis = '';
+  updateAIButtons();
+  setAIStatus('正在发送抓包数据给模型分析...', 'loading');
+  aiResult.innerHTML = '<div class="empty-state">AI 分析中，请稍候...</div>';
+
+  try {
+    const resp = await sendMsg({
+      action: 'analyzeCapture',
+      sessionId: selectedSessionId || currentSessionId || undefined,
+      config: cfg,
+      options: {
+        includeBodies: cfg.includeBodies,
+        redactSensitive: cfg.redactSensitive,
+        maxRequests: cfg.maxRequests
+      }
+    });
+    if (!resp.ok) throw new Error(resp.error || 'AI 分析失败');
+    latestAIAnalysis = resp.analysis || '';
+    const meta = resp.snapshotMeta || {};
+    setAIStatus(`分析完成：发送 ${meta.includedRequests || '-'} / ${meta.totalRequestsInSession || '-'} 条请求，模型 ${resp.model}`, 'ok');
+    aiResult.innerHTML = `<pre class="ai-markdown">${esc(latestAIAnalysis)}</pre>`;
+  } catch (e) {
+    latestAIAnalysis = '';
+    setAIStatus(e.message || 'AI 分析失败', 'err');
+    aiResult.innerHTML = `<div class="empty-state error">${esc(e.message || 'AI 分析失败')}</div>`;
+  } finally {
+    aiLoading = false;
+    updateAIButtons();
+  }
+}
+
+async function runAIAnalysisForRequest(requestId) {
+  const cfg = await saveAIConfig();
+  const err = validateAIConfig(cfg);
+  if (err) { setAIStatus(err, 'err'); document.querySelector('.tab[data-tab="ai"]').click(); return; }
+
+  document.querySelector('.tab[data-tab="ai"]').click();
+  aiLoading = true;
+  latestAIAnalysis = '';
+  updateAIButtons();
+  setAIStatus('正在分析当前选中的单条请求...', 'loading');
+  aiResult.innerHTML = '<div class="empty-state">AI 正在分析此请求，请稍候...</div>';
+
+  try {
+    const resp = await sendMsg({
+      action: 'analyzeRequest',
+      requestId,
+      config: cfg,
+      options: {
+        includeBodies: cfg.includeBodies,
+        redactSensitive: cfg.redactSensitive
+      }
+    });
+    if (!resp.ok) throw new Error(resp.error || 'AI 分析失败');
+    latestAIAnalysis = resp.analysis || '';
+    setAIStatus(`单条请求分析完成：${resp.requestMeta?.method || ''} ${resp.requestMeta?.status || ''}，模型 ${resp.model}`, 'ok');
+    aiResult.innerHTML = `<pre class="ai-markdown">${esc(latestAIAnalysis)}</pre>`;
+  } catch (e) {
+    latestAIAnalysis = '';
+    setAIStatus(e.message || 'AI 分析失败', 'err');
+    aiResult.innerHTML = `<div class="empty-state error">${esc(e.message || 'AI 分析失败')}</div>`;
+  } finally {
+    aiLoading = false;
+    updateAIButtons();
+  }
 }
 
 async function exportData(action, sessionId) {

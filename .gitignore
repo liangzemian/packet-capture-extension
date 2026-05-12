@@ -11,3 +11,6 @@ Thumbs.db
 
 # Dependencies (if added later)
 node_modules/
+
+# Notebook checkpoints
+.ipynb_checkpoints/

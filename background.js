@@ -355,7 +355,7 @@ async function buildHAR(sessionId) {
   return {
     log: {
       version: '1.2',
-      creator: { name: '抓包归档', version: '1.0.0' },
+      creator: { name: '抓包归档', version: '1.1.0' },
       entries: requests.map(req => ({
         startedDateTime: new Date(req.timestamp).toISOString(),
         time: req.duration || 0,
@@ -389,6 +389,404 @@ async function buildHAR(sessionId) {
         cache: {},
         timings: { send: 0, wait: req.duration || 0, receive: 0 }
       }))
+    }
+  };
+}
+
+// === AI Analysis ===
+const AI_PROVIDERS = {
+  openai: {
+    label: 'OpenAI 兼容',
+    defaultBaseUrl: 'https://api.openai.com',
+    modelsPath: '/v1/models',
+    chatPath: '/v1/chat/completions'
+  },
+  anthropic: {
+    label: 'Anthropic Claude',
+    defaultBaseUrl: 'https://api.anthropic.com',
+    modelsPath: '/v1/models',
+    chatPath: '/v1/messages'
+  }
+};
+const ANTHROPIC_VERSION = '2023-06-01';
+const DEFAULT_AI_MAX_REQUESTS = 40;
+const DEFAULT_AI_BODY_LIMIT = 6000;
+const DEFAULT_AI_OUTPUT_TOKENS = 2000;
+const SENSITIVE_KEY_RE = /(authorization|cookie|set-cookie|token|secret|password|passwd|pwd|api[-_]?key|access[-_]?key|session|jwt|csrf|xsrf|credential|signature|sign|auth)/i;
+
+function normalizeAIProvider(provider) {
+  return AI_PROVIDERS[provider] ? provider : 'openai';
+}
+
+function normalizeBaseUrl(provider, baseUrl = '') {
+  const p = normalizeAIProvider(provider);
+  return (baseUrl || AI_PROVIDERS[p].defaultBaseUrl)
+    .replace(/\/+$/, '')
+    .replace(/\/v1$/, '');
+}
+
+function buildModelsUrl(provider, config = {}) {
+  const raw = (config.modelsBaseUrl || config.modelListBaseUrl || '').trim().replace(/\/+$/, '');
+  if (raw && /\/v1\/models$/i.test(raw)) return raw;
+  const base = normalizeBaseUrl(provider, raw || config.baseUrl);
+  return `${base}${AI_PROVIDERS[provider].modelsPath}`;
+}
+
+function maskSensitiveValue(value) {
+  if (value === undefined || value === null) return value;
+  const s = String(value);
+  if (s.length <= 8) return '***';
+  return `${s.slice(0, 4)}***${s.slice(-4)}`;
+}
+
+function redactObject(obj, redactSensitive) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(v => redactObject(v, redactSensitive));
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (redactSensitive && SENSITIVE_KEY_RE.test(k)) {
+      out[k] = maskSensitiveValue(v);
+    } else if (v && typeof v === 'object') {
+      out[k] = redactObject(v, redactSensitive);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+function redactHeaders(headers, redactSensitive) {
+  return redactObject(headers || {}, redactSensitive) || {};
+}
+
+function redactUrl(url, redactSensitive) {
+  if (!redactSensitive) return url;
+  try {
+    const u = new URL(url);
+    for (const key of Array.from(u.searchParams.keys())) {
+      if (SENSITIVE_KEY_RE.test(key)) {
+        u.searchParams.set(key, maskSensitiveValue(u.searchParams.get(key)));
+      }
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+function truncateText(text, maxLen = DEFAULT_AI_BODY_LIMIT) {
+  if (text === undefined || text === null) return null;
+  const s = String(text);
+  if (s.length <= maxLen) return s;
+  return `${s.slice(0, maxLen)}\n... [truncated ${s.length - maxLen} chars]`;
+}
+
+function maybeRedactBody(body, redactSensitive, maxLen) {
+  if (!body) return null;
+  if (!redactSensitive) return truncateText(body, maxLen);
+  try {
+    const parsed = JSON.parse(String(body));
+    return truncateText(JSON.stringify(redactObject(parsed, true), null, 2), maxLen);
+  } catch {
+    try {
+      const raw = String(body);
+      if (raw.includes('=')) {
+        const params = new URLSearchParams(raw);
+        let changed = false;
+        for (const key of Array.from(params.keys())) {
+          if (SENSITIVE_KEY_RE.test(key)) {
+            params.set(key, maskSensitiveValue(params.get(key)));
+            changed = true;
+          }
+        }
+        if (changed) return truncateText(params.toString(), maxLen);
+      }
+    } catch { /* not form encoded */ }
+    return truncateText(body, maxLen);
+  }
+}
+
+function buildAIRequestSnapshot(req, options) {
+  const includeBodies = options.includeBodies !== false;
+  const redactSensitive = options.redactSensitive !== false;
+  const bodyLimit = Math.max(500, Number(options.bodyLimit) || DEFAULT_AI_BODY_LIMIT);
+
+  const item = {
+    id: req.id,
+    startedAt: req.timestamp ? new Date(req.timestamp).toISOString() : null,
+    durationMs: req.duration || 0,
+    resourceType: req.resourceType || 'Other',
+    request: {
+      method: req.method,
+      url: redactUrl(req.url, redactSensitive),
+      headers: redactHeaders(req.requestHeaders, redactSensitive)
+    },
+    response: {
+      status: req.pending ? 'PENDING' : (req.failed ? 'FAILED' : (req.status || 0)),
+      statusText: req.statusText || '',
+      contentType: req.contentType || '',
+      size: req.size || 0,
+      headers: redactHeaders(req.responseHeaders, redactSensitive)
+    }
+  };
+
+  if (includeBodies) {
+    item.request.body = maybeRedactBody(req.requestBody, redactSensitive, bodyLimit);
+    item.response.body = req.responseBase64Encoded
+      ? `[base64 response omitted, length=${String(req.responseBody || '').length}]`
+      : maybeRedactBody(req.responseBody, redactSensitive, bodyLimit);
+  }
+  if (req.failed) item.error = req.errorText || 'Unknown error';
+  if (req.pending) item.pending = true;
+  if (req.truncated) item.response.truncatedByCapture = true;
+  return item;
+}
+
+async function getRequestsForAnalysis(sessionId) {
+  const requests = sessionId
+    ? await dbGetByIndex(STORE_REQUESTS, 'sessionId', sessionId)
+    : await dbGetAll(STORE_REQUESTS);
+  const pending = Array.from(pendingRequests.values())
+    .filter(req => !sessionId || req.sessionId === sessionId)
+    .map(req => ({ ...req, pending: true, id: req.id || req.requestId }));
+  return requests.concat(pending).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+}
+
+function buildAnalysisMessages(snapshot) {
+  const system = [
+    '你是资深 HTTP/API 抓包分析助手。',
+    '请基于用户提供的 Chrome 抓包数据分析业务流程、接口用途和潜在问题。',
+    '不要编造抓包中不存在的接口或字段；不确定时明确说明。',
+    '输出中文 Markdown，结构包含：总体结论、请求链路、关键接口、异常/风险、建议下一步。'
+  ].join('\n');
+
+  const user = [
+    '请分析下面这批实时抓包请求。重点关注：',
+    '1. 业务链路/页面动作大概做了什么；',
+    '2. 每个关键 URL 的请求方法、状态码、请求参数/返回字段含义；',
+    '3. 失败状态、鉴权/CORS/参数/风控/重试/重定向等问题；',
+    '4. 可执行的修复或继续排查建议。',
+    '',
+    '抓包 JSON：',
+    '```json',
+    JSON.stringify(snapshot, null, 2),
+    '```'
+  ].join('\n');
+
+  return { system, user };
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 60_000) {
+  if (AbortSignal.timeout) {
+    return fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function extractAIText(provider, data) {
+  if (provider === 'anthropic') {
+    return (data.content || [])
+      .map(part => part.type === 'text' ? part.text : '')
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+  }
+
+  const content = data.choices?.[0]?.message?.content;
+  if (Array.isArray(content)) {
+    return content.map(part => part.text || part.content || '').join('\n').trim();
+  }
+  return String(content || '').trim();
+}
+
+async function callAIModel(config, snapshot) {
+  const provider = normalizeAIProvider(config.provider);
+  const base = normalizeBaseUrl(provider, config.baseUrl);
+  const apiKey = (config.apiKey || '').trim();
+  const model = (config.model || '').trim();
+  const maxTokens = Math.max(256, Number(config.maxOutputTokens) || DEFAULT_AI_OUTPUT_TOKENS);
+
+  if (!apiKey) throw new Error('缺少 API Key');
+  if (!model) throw new Error('缺少模型名称');
+
+  const { system, user } = buildAnalysisMessages(snapshot);
+  let url;
+  let headers;
+  let body;
+
+  if (provider === 'anthropic') {
+    url = `${base}${AI_PROVIDERS.anthropic.chatPath}`;
+    headers = {
+      'x-api-key': apiKey,
+      'anthropic-version': ANTHROPIC_VERSION,
+      'anthropic-dangerous-direct-browser-access': 'true',
+      'Content-Type': 'application/json'
+    };
+    body = {
+      model,
+      max_tokens: maxTokens,
+      temperature: 0.2,
+      system,
+      messages: [{ role: 'user', content: user }]
+    };
+  } else {
+    url = `${base}${AI_PROVIDERS.openai.chatPath}`;
+    headers = {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    };
+    body = {
+      model,
+      temperature: 0.2,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ]
+    };
+  }
+
+  const res = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body)
+  }, 90_000);
+
+  const text = await res.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+
+  if (!res.ok) {
+    const errMsg = data.error?.message || data.message || text || `HTTP ${res.status}`;
+    throw new Error(`模型接口返回 ${res.status}: ${errMsg}`);
+  }
+
+  const analysis = extractAIText(provider, data);
+  if (!analysis) throw new Error('模型响应中没有可读文本');
+
+  return {
+    provider,
+    model,
+    baseUrl: base,
+    analysis,
+    usage: data.usage || null
+  };
+}
+
+async function listAIModels(config) {
+  const provider = normalizeAIProvider(config.provider);
+  const apiKey = (config.apiKey || '').trim();
+  if (!apiKey) throw new Error('缺少 API Key');
+  const modelsUrl = buildModelsUrl(provider, config);
+
+  if (provider === 'anthropic') {
+    const headers = {
+      'x-api-key': apiKey,
+      'anthropic-version': ANTHROPIC_VERSION,
+      'anthropic-dangerous-direct-browser-access': 'true'
+    };
+    const models = [];
+    let afterId;
+    while (true) {
+      const params = new URLSearchParams({ limit: '1000' });
+      if (afterId) params.set('after_id', afterId);
+      const url = `${modelsUrl}?${params.toString()}`;
+      const res = await fetchWithTimeout(url, { headers }, 30_000);
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+      if (!res.ok) {
+        const errMsg = data.error?.message || data.message || text || `HTTP ${res.status}`;
+        throw new Error(`获取模型列表失败 ${res.status}: ${errMsg}`);
+      }
+      models.push(...(data.data || []).map(m => ({
+        id: m.id,
+        displayName: m.display_name || m.id
+      })));
+      if (!data.has_more || !data.last_id) break;
+      afterId = data.last_id;
+    }
+    return models;
+  }
+
+  const url = modelsUrl;
+  const headers = { Authorization: `Bearer ${apiKey}` };
+  const res = await fetchWithTimeout(url, { headers }, 30_000);
+  const text = await res.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (!res.ok) {
+    const errMsg = data.error?.message || data.message || text || `HTTP ${res.status}`;
+    throw new Error(`获取模型列表失败 ${res.status}: ${errMsg}`);
+  }
+  return (data.data || []).map(m => ({
+    id: m.id,
+    displayName: m.id
+  }));
+}
+
+async function analyzeCapture(msg) {
+  const requests = await getRequestsForAnalysis(msg.sessionId);
+  if (!requests.length) throw new Error('当前会话没有可分析的请求');
+
+  const maxRequests = Math.max(1, Number(msg.options?.maxRequests) || DEFAULT_AI_MAX_REQUESTS);
+  const clipped = requests.slice(-maxRequests);
+  const snapshot = {
+    generatedAt: new Date().toISOString(),
+    sessionId: msg.sessionId || null,
+    totalRequestsInSession: requests.length,
+    includedRequests: clipped.length,
+    note: clipped.length < requests.length ? `仅发送最后 ${clipped.length} 条请求给模型` : '',
+    options: {
+      includeBodies: msg.options?.includeBodies !== false,
+      redactSensitive: msg.options?.redactSensitive !== false
+    },
+    requests: clipped.map(req => buildAIRequestSnapshot(req, msg.options || {}))
+  };
+
+  const result = await callAIModel(msg.config || {}, snapshot);
+  return { ok: true, ...result, snapshotMeta: {
+    totalRequestsInSession: requests.length,
+    includedRequests: clipped.length
+  }};
+}
+
+async function analyzeRequest(msg) {
+  const req = await dbGet(STORE_REQUESTS, msg.requestId);
+  if (!req) throw new Error('未找到选中的请求记录');
+
+  const snapshot = {
+    generatedAt: new Date().toISOString(),
+    sessionId: req.sessionId || null,
+    totalRequestsInSession: 1,
+    includedRequests: 1,
+    note: '仅分析用户选中的单条请求，请重点解释请求用途、参数、响应字段、异常风险和排查建议。',
+    options: {
+      includeBodies: msg.options?.includeBodies !== false,
+      redactSensitive: msg.options?.redactSensitive !== false
+    },
+    requests: [buildAIRequestSnapshot(req, msg.options || {})]
+  };
+
+  const result = await callAIModel(msg.config || {}, snapshot);
+  return {
+    ok: true,
+    ...result,
+    requestMeta: {
+      id: req.id,
+      method: req.method,
+      status: req.status,
+      url: req.url
+    },
+    snapshotMeta: {
+      totalRequestsInSession: 1,
+      includedRequests: 1
     }
   };
 }
@@ -460,6 +858,17 @@ async function handleMessage(msg) {
         : await dbGetAll(STORE_REQUESTS);
       return { ok: true, data: requests, ext: 'json' };
     }
+
+    case 'listAIModels': {
+      const models = await listAIModels(msg.config || {});
+      return { ok: true, models };
+    }
+
+    case 'analyzeCapture':
+      return await analyzeCapture(msg);
+
+    case 'analyzeRequest':
+      return await analyzeRequest(msg);
 
     case 'clearRequests': {
       if (msg.sessionId) {

@@ -15,6 +15,7 @@
     </div>
     <div class="header-actions">
       <button id="captureBtn" class="btn btn-primary">开始抓包</button>
+      <button id="aiAnalyzeBtn" class="btn btn-ai" disabled>AI分析</button>
       <button id="exportHarBtn" class="btn btn-secondary" disabled>导出 HAR</button>
       <button id="exportJsonBtn" class="btn btn-secondary" disabled>导出 JSON</button>
       <button id="clearBtn" class="btn btn-danger" disabled>清空</button>
@@ -25,6 +26,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="capture">实时抓包</button>
     <button class="tab" data-tab="archive">历史归档</button>
+    <button class="tab" data-tab="ai">AI解读</button>
   </div>
 
   <!-- Capture Tab -->
@@ -57,6 +59,66 @@
   <div class="tab-content" id="archiveTab">
     <div class="archive-list" id="archiveList">
       <div class="empty-state">暂无归档记录</div>
+    </div>
+  </div>
+
+  <!-- AI Tab -->
+  <div class="tab-content" id="aiTab">
+    <div class="ai-config">
+      <div class="ai-row">
+        <label>
+          <span>模型厂商</span>
+          <select id="aiProvider">
+            <option value="openai">OpenAI 兼容</option>
+            <option value="anthropic">Anthropic Claude</option>
+          </select>
+        </label>
+        <label>
+          <span>Base URL</span>
+          <input type="url" id="aiBaseUrl" placeholder="https://api.openai.com">
+        </label>
+      </div>
+      <div class="ai-row">
+        <label class="ai-wide">
+          <span>模型列表 URL（可选，留空则使用上方 Base URL）</span>
+          <input type="url" id="aiModelsBaseUrl" placeholder="https://api.openai.com/v1/models 或 https://api.openai.com">
+        </label>
+      </div>
+      <div class="ai-row">
+        <label>
+          <span>API Key</span>
+          <input type="password" id="aiApiKey" placeholder="sk-...">
+        </label>
+        <label>
+          <span>模型</span>
+          <select id="aiModel">
+            <option value="">请先获取模型列表或选择自定义输入</option>
+            <option value="__custom__">自定义输入...</option>
+          </select>
+        </label>
+      </div>
+      <div class="ai-row is-hidden" id="aiCustomModelRow">
+        <label class="ai-wide">
+          <span>自定义模型</span>
+          <input type="text" id="aiCustomModel" placeholder="gpt-4o-mini / claude-3-5-sonnet-latest">
+        </label>
+      </div>
+      <div class="ai-options">
+        <label><input type="checkbox" id="aiIncludeBodies" checked> 发送请求/返回 Body</label>
+        <label><input type="checkbox" id="aiRedactSensitive" checked> 脱敏敏感字段</label>
+        <label>最多请求数 <input type="number" id="aiMaxRequests" min="1" max="200" value="40"></label>
+      </div>
+      <div class="ai-actions">
+        <button id="aiSaveBtn" class="btn btn-secondary">保存配置</button>
+        <button id="aiLoadModelsBtn" class="btn btn-secondary">获取模型列表</button>
+        <button id="aiRunBtn" class="btn btn-ai">分析当前会话</button>
+        <button id="aiCopyBtn" class="btn btn-secondary" disabled>复制结果</button>
+      </div>
+      <div class="ai-note">提示：Base URL 用于 AI 分析调用；模型列表 URL 仅用于「获取模型列表」，可填完整 /v1/models 地址，也可填 OpenAI 兼容 Base URL。AI 分析会把当前会话的抓包摘要发送到你配置的模型接口；默认会脱敏 Cookie、Authorization、token 等敏感字段。</div>
+    </div>
+    <div class="ai-status" id="aiStatus">尚未分析</div>
+    <div class="ai-result" id="aiResult">
+      <div class="empty-state">配置模型后，点击「AI分析」或「分析当前会话」生成结论。</div>
     </div>
   </div>
 
