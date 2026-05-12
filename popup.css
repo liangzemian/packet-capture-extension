@@ -16,31 +16,69 @@ body {
   overflow: hidden;
 }
 
-.popup-resize-btn {
+.popup-resize-handle {
   position: fixed;
-  right: 8px;
-  bottom: 8px;
   z-index: 1000;
-  width: 28px;
-  height: 28px;
-  border: 1px solid #0f3460;
-  border-radius: 8px;
-  background: rgba(22, 33, 62, 0.92);
-  color: #4fc3f7;
-  font-size: 15px;
-  line-height: 1;
-  cursor: nwse-resize;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  background: transparent;
   user-select: none;
   touch-action: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
-.popup-resize-btn:hover {
-  background: #0f3460;
-  color: #fff;
+.popup-resize-handle::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: rgba(79, 195, 247, 0.75);
+  border-style: solid;
+}
+.popup-resize-handle:hover::after {
+  border-color: #fff;
+}
+.popup-resize-tl {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+.popup-resize-tl::after {
+  top: 4px;
+  left: 4px;
+  border-width: 2px 0 0 2px;
+}
+.popup-resize-tr {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+.popup-resize-tr::after {
+  top: 4px;
+  right: 4px;
+  border-width: 2px 2px 0 0;
+}
+.popup-resize-bl {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+.popup-resize-bl::after {
+  bottom: 4px;
+  left: 4px;
+  border-width: 0 0 2px 2px;
+}
+.popup-resize-br {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+.popup-resize-br::after {
+  right: 4px;
+  bottom: 4px;
+  border-width: 0 2px 2px 0;
 }
 .popup-resizing,
 .popup-resizing * {
-  cursor: nwse-resize !important;
   user-select: none !important;
 }
 

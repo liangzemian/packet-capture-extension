@@ -33,7 +33,7 @@ const aiRunBtn = $('aiRunBtn');
 const aiCopyBtn = $('aiCopyBtn');
 const aiStatus = $('aiStatus');
 const aiResult = $('aiResult');
-const popupResizeBtn = $('popupResizeBtn');
+const popupResizeHandles = document.querySelectorAll('.popup-resize-handle');
 
 let capturing = false;
 let currentTabId = null;
@@ -98,12 +98,16 @@ function applyPopupScale(scale) {
   const nextScale = clampPopupScale(scale);
   document.documentElement.style.setProperty('--popup-width', `${Math.round(POPUP_BASE_WIDTH * nextScale)}px`);
   document.documentElement.style.setProperty('--popup-height', `${Math.round(POPUP_BASE_HEIGHT * nextScale)}px`);
-  popupResizeBtn.title = `拖拽缩放窗口（${Math.round(nextScale * 100)}%）`;
-  popupResizeBtn.setAttribute('aria-label', popupResizeBtn.title);
+  const label = `拖拽缩放窗口（${Math.round(nextScale * 100)}%）`;
+  popupResizeHandles.forEach(handle => {
+    handle.title = label;
+    handle.setAttribute('aria-label', label);
+  });
 }
 
 function startPopupResize(e) {
   e.preventDefault();
+  const corner = e.currentTarget.dataset.corner || 'br';
   const startX = e.clientX;
   const startY = e.clientY;
   const startWidth = document.documentElement.clientWidth || POPUP_BASE_WIDTH;
@@ -113,7 +117,9 @@ function startPopupResize(e) {
   const onMove = (moveEvent) => {
     const dx = moveEvent.clientX - startX;
     const dy = moveEvent.clientY - startY;
-    const delta = Math.max(dx / POPUP_BASE_WIDTH, dy / POPUP_BASE_HEIGHT);
+    const sx = corner.includes('l') ? -1 : 1;
+    const sy = corner.includes('t') ? -1 : 1;
+    const delta = Math.max((sx * dx) / POPUP_BASE_WIDTH, (sy * dy) / POPUP_BASE_HEIGHT);
     applyPopupScale(startScale + delta);
   };
 
@@ -353,7 +359,7 @@ aiSaveBtn.addEventListener('click', async () => {
 });
 aiLoadModelsBtn.addEventListener('click', loadAIModels);
 aiModel.addEventListener('change', updateCustomModelVisibility);
-popupResizeBtn.addEventListener('mousedown', startPopupResize);
+popupResizeHandles.forEach(handle => handle.addEventListener('mousedown', startPopupResize));
 aiCopyBtn.addEventListener('click', async () => {
   if (!latestAIAnalysis) return;
   try {
