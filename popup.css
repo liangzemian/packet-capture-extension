@@ -2,14 +2,8 @@
 
 html,
 body {
-  width: 760px;
-  height: 560px;
-}
-
-html.popup-expanded,
-html.popup-expanded body {
-  width: 920px;
-  height: 680px;
+  width: var(--popup-width, 760px);
+  height: var(--popup-height, 560px);
 }
 
 body {
@@ -35,12 +29,19 @@ body {
   color: #4fc3f7;
   font-size: 15px;
   line-height: 1;
-  cursor: pointer;
+  cursor: nwse-resize;
+  user-select: none;
+  touch-action: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 .popup-resize-btn:hover {
   background: #0f3460;
   color: #fff;
+}
+.popup-resizing,
+.popup-resizing * {
+  cursor: nwse-resize !important;
+  user-select: none !important;
 }
 
 /* === Header === */

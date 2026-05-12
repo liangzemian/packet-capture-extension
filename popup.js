@@ -47,7 +47,10 @@ let latestAIAnalysis = '';
 
 const AI_CONFIG_KEY = 'aiConfig';
 const UI_SIZE_KEY = 'popupSize';
-const UI_SIZE_EXPANDED = 'expanded';
+const POPUP_BASE_WIDTH = 760;
+const POPUP_BASE_HEIGHT = 560;
+const POPUP_MIN_SCALE = 0.9;
+const POPUP_MAX_SCALE = 1.35;
 const AI_DEFAULT_BASE_URL = {
   openai: 'https://api.openai.com',
   anthropic: 'https://api.anthropic.com'
@@ -84,20 +87,46 @@ async function init() {
 
 async function loadPopupSize() {
   const data = await chrome.storage.local.get(UI_SIZE_KEY);
-  applyPopupSize(data[UI_SIZE_KEY] === UI_SIZE_EXPANDED);
+  applyPopupScale(Number(data[UI_SIZE_KEY]?.scale) || 1);
 }
 
-function applyPopupSize(expanded) {
-  document.documentElement.classList.toggle('popup-expanded', expanded);
-  popupResizeBtn.textContent = expanded ? '↙' : '↗';
-  popupResizeBtn.title = expanded ? '缩小窗口' : '扩大窗口';
-  popupResizeBtn.setAttribute('aria-label', expanded ? '缩小窗口' : '扩大窗口');
+function clampPopupScale(scale) {
+  return Math.min(POPUP_MAX_SCALE, Math.max(POPUP_MIN_SCALE, scale || 1));
 }
 
-async function togglePopupSize() {
-  const expanded = !document.documentElement.classList.contains('popup-expanded');
-  applyPopupSize(expanded);
-  await chrome.storage.local.set({ [UI_SIZE_KEY]: expanded ? UI_SIZE_EXPANDED : 'compact' });
+function applyPopupScale(scale) {
+  const nextScale = clampPopupScale(scale);
+  document.documentElement.style.setProperty('--popup-width', `${Math.round(POPUP_BASE_WIDTH * nextScale)}px`);
+  document.documentElement.style.setProperty('--popup-height', `${Math.round(POPUP_BASE_HEIGHT * nextScale)}px`);
+  popupResizeBtn.title = `拖拽缩放窗口（${Math.round(nextScale * 100)}%）`;
+  popupResizeBtn.setAttribute('aria-label', popupResizeBtn.title);
+}
+
+function startPopupResize(e) {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const startWidth = document.documentElement.clientWidth || POPUP_BASE_WIDTH;
+  const startScale = startWidth / POPUP_BASE_WIDTH;
+  document.documentElement.classList.add('popup-resizing');
+
+  const onMove = (moveEvent) => {
+    const dx = moveEvent.clientX - startX;
+    const dy = moveEvent.clientY - startY;
+    const delta = Math.max(dx / POPUP_BASE_WIDTH, dy / POPUP_BASE_HEIGHT);
+    applyPopupScale(startScale + delta);
+  };
+
+  const onUp = async () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.documentElement.classList.remove('popup-resizing');
+    const scale = (document.documentElement.clientWidth || POPUP_BASE_WIDTH) / POPUP_BASE_WIDTH;
+    await chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: clampPopupScale(scale) } });
+  };
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
 }
 
 // === Messaging ===
@@ -324,7 +353,7 @@ aiSaveBtn.addEventListener('click', async () => {
 });
 aiLoadModelsBtn.addEventListener('click', loadAIModels);
 aiModel.addEventListener('change', updateCustomModelVisibility);
-popupResizeBtn.addEventListener('click', togglePopupSize);
+popupResizeBtn.addEventListener('mousedown', startPopupResize);
 aiCopyBtn.addEventListener('click', async () => {
   if (!latestAIAnalysis) return;
   try {
