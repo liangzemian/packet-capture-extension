@@ -17,13 +17,13 @@
 
 | 功能名称 | 功能说明 | 技术栈 | 状态 | 版本 |
 |---------|---------|--------|------|------|
-| 实时抓包 | 捕获 URL、Method、Headers、Body、状态码、耗时、失败信息 | CDP / `chrome.debugger` | ✅ 已完成 | v1.0.0 |
-| 响应体获取 | 通过 `Network.getResponseBody` 读取完整响应内容 | Chrome DevTools Protocol | ✅ 已完成 | v1.0.0 |
-| 会话归档 | 每次抓包自动创建会话，支持历史查看、删除、导出 | IndexedDB | ✅ 已完成 | v1.0.0 |
-| 请求过滤 | 按 URL、HTTP 方法、状态码实时过滤请求 | Vanilla JS | ✅ 已完成 | v1.0.0 |
-| 请求详情 | 查看 General、Request Headers、Request Body、Response Headers、Response Body | HTML / CSS / JS | ✅ 已完成 | v1.0.0 |
-| HAR 导出 | 导出 HAR 1.2，可导入 DevTools、Charles、Fiddler | JSON / Downloads API | ✅ 已完成 | v1.0.0 |
-| JSON 导出 | 导出原始抓包数据，方便二次处理 | JSON / Downloads API | ✅ 已完成 | v1.0.0 |
+| 实时抓包 | 捕获 URL、Method、Headers、Body、状态码、耗时、失败信息 | CDP / `chrome.debugger` | ✅ 已完成 | v0.0.1 |
+| 响应体获取 | 通过 `Network.getResponseBody` 读取完整响应内容 | Chrome DevTools Protocol | ✅ 已完成 | v0.0.1 |
+| 会话归档 | 每次抓包自动创建会话，支持历史查看、删除、导出 | IndexedDB | ✅ 已完成 | v0.0.1 |
+| 请求过滤 | 按 URL、HTTP 方法、状态码实时过滤请求 | Vanilla JS | ✅ 已完成 | v0.0.1 |
+| 请求详情 | 查看 General、Request Headers、Request Body、Response Headers、Response Body | HTML / CSS / JS | ✅ 已完成 | v0.0.1 |
+| HAR 导出 | 导出 HAR 1.2，可导入 DevTools、Charles、Fiddler | JSON / Downloads API | ✅ 已完成 | v0.0.1 |
+| JSON 导出 | 导出原始抓包数据，方便二次处理 | JSON / Downloads API | ✅ 已完成 | v0.0.1 |
 | AI 解读 | 将当前会话摘要发送给大模型，生成业务链路、接口用途、异常风险和排查建议 | Fetch API | ✅ 已完成 | v0.0.1 |
 | 单条请求 AI 分析 | 选中任意请求后单独分析该请求和响应，便于理解接口用途与返回字段 | Fetch API | ✅ 已完成 | v0.0.2 |
 | 多模型接入 | 支持 OpenAI 兼容接口、Anthropic Claude 接口、自定义 Base URL 和独立模型列表 URL | `/v1/chat/completions` / `/v1/messages` | ✅ 已完成 | v0.0.2 |
@@ -383,8 +383,7 @@ AI 配置保存在本机浏览器的 `chrome.storage.local`。请勿在不可信
 | 版本 | 说明 |
 |------|------|
 | v0.0.2 | 新增单条请求 AI 分析、独立模型列表 URL、模型下拉选择、AI 结果区滚动优化 |
-| v0.0.1 | 新增 AI 解读、多模型接入、敏感字段脱敏、状态恢复优化 |
-| v1.0.0 | 实时抓包、会话归档、请求详情、HAR / JSON 导出 |
+| v0.0.1 | 实时抓包、会话归档、请求详情、HAR / JSON 导出、AI 解读、多模型接入、敏感字段脱敏、状态恢复优化 |
 
 ## 路线图
 
@@ -440,6 +439,9 @@ AI 配置保存在本机浏览器的 `chrome.storage.local`。请勿在不可信
 
 ### v0.0.1
 
+- 实现基于 `chrome.debugger` 的 CDP 抓包核心
+- 支持捕获 URL、Method、Headers、Request Body、Response Body、状态码、耗时和失败信息
+- 支持会话归档、实时请求过滤、请求详情查看、HAR 1.2 导出和原始 JSON 导出
 - 新增 AI 解读标签页，支持对当前抓包会话生成业务链路、关键接口、异常风险和排查建议
 - 支持 OpenAI 兼容接口和 Anthropic Claude 接口
 - 支持自定义 Base URL，可接入 NewAPI、OneAPI、自建模型网关
