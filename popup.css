@@ -2,8 +2,8 @@
 
 html,
 body {
-  width: var(--popup-width, 760px);
-  height: var(--popup-height, 560px);
+  width: var(--popup-width, 800px);
+  height: var(--popup-height, 600px);
 }
 
 body {

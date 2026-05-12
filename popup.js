@@ -47,10 +47,10 @@ let latestAIAnalysis = '';
 
 const AI_CONFIG_KEY = 'aiConfig';
 const UI_SIZE_KEY = 'popupSize';
-const POPUP_BASE_WIDTH = 760;
-const POPUP_BASE_HEIGHT = 560;
-const POPUP_MIN_SCALE = 0.9;
-const POPUP_MAX_SCALE = 1.35;
+const POPUP_BASE_WIDTH = 800;
+const POPUP_BASE_HEIGHT = 600;
+const POPUP_MIN_SCALE = 0.95;
+const POPUP_MAX_SCALE = 1.2;
 const AI_DEFAULT_BASE_URL = {
   openai: 'https://api.openai.com',
   anthropic: 'https://api.anthropic.com'
@@ -87,7 +87,14 @@ async function init() {
 
 async function loadPopupSize() {
   const data = await chrome.storage.local.get(UI_SIZE_KEY);
-  applyPopupScale(Number(data[UI_SIZE_KEY]?.scale) || 1);
+  const savedScale = Number(data[UI_SIZE_KEY]?.scale);
+  const safeScale = Number.isFinite(savedScale) && savedScale >= POPUP_MIN_SCALE && savedScale <= POPUP_MAX_SCALE
+    ? savedScale
+    : 1;
+  applyPopupScale(safeScale);
+  if (safeScale !== savedScale) {
+    await chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: safeScale } });
+  }
 }
 
 function clampPopupScale(scale) {
@@ -108,6 +115,11 @@ function applyPopupScale(scale) {
 function startPopupResize(e) {
   e.preventDefault();
   const corner = e.currentTarget.dataset.corner || 'br';
+  if (e.detail >= 2) {
+    applyPopupScale(1);
+    chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: 1 } });
+    return;
+  }
   const startX = e.clientX;
   const startY = e.clientY;
   const startWidth = document.documentElement.clientWidth || POPUP_BASE_WIDTH;
