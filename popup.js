@@ -47,6 +47,7 @@ let latestAIAnalysis = '';
 
 const AI_CONFIG_KEY = 'aiConfig';
 const UI_SIZE_KEY = 'popupSize';
+const UI_SIZE_VERSION = 2;
 const POPUP_BASE_WIDTH = 800;
 const POPUP_BASE_HEIGHT = 600;
 const POPUP_MIN_SCALE = 0.95;
@@ -87,13 +88,17 @@ async function init() {
 
 async function loadPopupSize() {
   const data = await chrome.storage.local.get(UI_SIZE_KEY);
-  const savedScale = Number(data[UI_SIZE_KEY]?.scale);
-  const safeScale = Number.isFinite(savedScale) && savedScale >= POPUP_MIN_SCALE && savedScale <= POPUP_MAX_SCALE
+  const saved = data[UI_SIZE_KEY] || {};
+  const savedScale = Number(saved.scale);
+  const safeScale = saved.version === UI_SIZE_VERSION &&
+    Number.isFinite(savedScale) &&
+    savedScale >= POPUP_MIN_SCALE &&
+    savedScale <= POPUP_MAX_SCALE
     ? savedScale
     : 1;
   applyPopupScale(safeScale);
-  if (safeScale !== savedScale) {
-    await chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: safeScale } });
+  if (safeScale !== savedScale || saved.version !== UI_SIZE_VERSION) {
+    await chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: safeScale, version: UI_SIZE_VERSION } });
   }
 }
 
@@ -103,8 +108,14 @@ function clampPopupScale(scale) {
 
 function applyPopupScale(scale) {
   const nextScale = clampPopupScale(scale);
-  document.documentElement.style.setProperty('--popup-width', `${Math.round(POPUP_BASE_WIDTH * nextScale)}px`);
-  document.documentElement.style.setProperty('--popup-height', `${Math.round(POPUP_BASE_HEIGHT * nextScale)}px`);
+  const width = `${Math.round(POPUP_BASE_WIDTH * nextScale)}px`;
+  const height = `${Math.round(POPUP_BASE_HEIGHT * nextScale)}px`;
+  [document.documentElement, document.body].forEach(el => {
+    el.style.width = width;
+    el.style.height = height;
+    el.style.minWidth = width;
+    el.style.minHeight = height;
+  });
   const label = `拖拽缩放窗口（${Math.round(nextScale * 100)}%）`;
   popupResizeHandles.forEach(handle => {
     handle.title = label;
@@ -117,7 +128,7 @@ function startPopupResize(e) {
   const corner = e.currentTarget.dataset.corner || 'br';
   if (e.detail >= 2) {
     applyPopupScale(1);
-    chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: 1 } });
+    chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: 1, version: UI_SIZE_VERSION } });
     return;
   }
   const startX = e.clientX;
@@ -140,7 +151,7 @@ function startPopupResize(e) {
     document.removeEventListener('mouseup', onUp);
     document.documentElement.classList.remove('popup-resizing');
     const scale = (document.documentElement.clientWidth || POPUP_BASE_WIDTH) / POPUP_BASE_WIDTH;
-    await chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: clampPopupScale(scale) } });
+    await chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: clampPopupScale(scale), version: UI_SIZE_VERSION } });
   };
 
   document.addEventListener('mousemove', onMove);

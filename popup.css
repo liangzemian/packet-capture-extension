@@ -2,8 +2,10 @@
 
 html,
 body {
-  width: var(--popup-width, 800px);
-  height: var(--popup-height, 600px);
+  width: 800px;
+  height: 600px;
+  min-width: 800px;
+  min-height: 600px;
 }
 
 body {
