@@ -60,10 +60,20 @@ cd packet-capture-extension
 然后在浏览器中加载扩展：
 
 1. 打开 `chrome://extensions/`
+
 2. 开启右上角「开发者模式」
+
 3. 点击「加载已解压的扩展程序」
+
 4. 选择本项目根目录
+
 5. 工具栏出现「抓包归档」图标，即可使用
+
+   ![](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/image-20260512195245796.png)
+
+![](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/image-20260512195332025.png)
+
+![](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/image-20260512195412670.png)
 
 ## 使用说明
 
@@ -83,6 +93,16 @@ cd packet-capture-extension
 6. 在列表中点击任意请求查看详情
 
 > 抓包期间浏览器顶部会显示调试提示条，这是 Chrome Debugger API 的系统行为，无法由扩展隐藏。
+
+
+
+![image-20260512223223840](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/image-20260512223223840.png)
+
+生成图片后
+
+![image-20260512223318398](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/image-20260512223318398.png)
+
+抓取请求的数据包
 
 ### 过滤请求
 
@@ -107,19 +127,31 @@ cd packet-capture-extension
 | 导出 HAR | HAR 1.2 | 导入 Chrome DevTools、Charles、Fiddler、HAR 分析工具 |
 | 导出 JSON | 原始请求数组 | 脚本分析、归档、AI 二次处理、测试回放 |
 
+![image-20260512223516388](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/image-20260512223516388.png)
+
+![image-20260512223545799](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/image-20260512223545799.png)
+
 ### AI 解读
 
 1. 切换到「AI解读」标签页
+
 2. 选择模型厂商：
    - **OpenAI 兼容**：默认 `https://api.openai.com`，也支持 NewAPI、OneAPI、自建网关等兼容地址
    - **Anthropic Claude**：默认 `https://api.anthropic.com`
+   
 3. 填写 `Base URL`、`API Key` 和模型名
+
 4. 如模型调用地址和模型列表地址不同，可填写「模型列表 URL」；留空则使用 `Base URL`
+
 5. 可点击「获取模型列表」拉取模型，并从下拉列表中选择一个模型；如接口不支持列表，可选择「自定义输入...」
+
+   ![image-20260512223823532](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/image-20260512223823532.png)
+
 6. 按需调整：
    - 发送请求/返回 Body
    - 脱敏敏感字段
    - 最多请求数
+   
 7. 点击「AI分析」或「分析当前会话」生成结论
 
 也可以在「实时抓包」列表中点击某一条请求，展开详情后点击「AI分析此请求」，只分析该条请求和响应内容。
@@ -132,6 +164,8 @@ Base URL：https://coding.dashscope.aliyuncs.com/v1
 ```
 
 > 安全提示：AI 解读会把抓包摘要发送到你配置的模型接口。分析包含账号、Cookie、Token 或业务敏感信息的流量时，请保持「脱敏敏感字段」开启，或使用可信的自建模型网关。
+
+![image-20260512224516815](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/image-20260512224516815.png)
 
 ### 历史归档
 
