@@ -186,8 +186,6 @@ packet-capture-extension/
 ├── popup.html          # Popup 页面：实时抓包 / 历史归档 / AI 解读
 ├── popup.css           # 暗色 DevTools 风格 UI 样式
 ├── popup.js            # Popup 交互、过滤、详情、下载、AI 配置
-├── docs/               # 业务分析文档
-│   └── DreaminaCapCut注册流程抓包业务分析.md
 ├── CLAUDE.md           # 项目维护说明
 ├── .gitignore
 └── README.md
@@ -248,10 +246,6 @@ packet-capture-extension/
 | `analyzeRequest` | Popup → Service Worker | 对单条请求调用模型分析 |
 | `clearRequests` | Popup → Service Worker | 清空请求数据 |
 | `deleteSession` | Popup → Service Worker | 删除会话及关联请求 |
-
-## 文档地址
-
-- [Dreamina / CapCut 注册流程抓包业务分析](docs/DreaminaCapCut注册流程抓包业务分析.md)
 
 ## 开发指南
 
