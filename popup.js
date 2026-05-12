@@ -33,6 +33,7 @@ const aiRunBtn = $('aiRunBtn');
 const aiCopyBtn = $('aiCopyBtn');
 const aiStatus = $('aiStatus');
 const aiResult = $('aiResult');
+const appShell = $('appShell');
 const popupResizeHandles = document.querySelectorAll('.popup-resize-handle');
 
 let capturing = false;
@@ -110,7 +111,8 @@ function applyPopupScale(scale) {
   const nextScale = clampPopupScale(scale);
   const width = `${Math.round(POPUP_BASE_WIDTH * nextScale)}px`;
   const height = `${Math.round(POPUP_BASE_HEIGHT * nextScale)}px`;
-  [document.documentElement, document.body].forEach(el => {
+  [document.documentElement, document.body, appShell].forEach(el => {
+    if (!el) return;
     el.style.width = width;
     el.style.height = height;
     el.style.minWidth = width;
