@@ -33,8 +33,6 @@ const aiRunBtn = $('aiRunBtn');
 const aiCopyBtn = $('aiCopyBtn');
 const aiStatus = $('aiStatus');
 const aiResult = $('aiResult');
-const appShell = $('appShell');
-const popupResizeHandles = document.querySelectorAll('.popup-resize-handle');
 
 let capturing = false;
 let currentTabId = null;
@@ -47,12 +45,6 @@ let aiLoading = false;
 let latestAIAnalysis = '';
 
 const AI_CONFIG_KEY = 'aiConfig';
-const UI_SIZE_KEY = 'popupSize';
-const UI_SIZE_VERSION = 2;
-const POPUP_BASE_WIDTH = 800;
-const POPUP_BASE_HEIGHT = 600;
-const POPUP_MIN_SCALE = 0.95;
-const POPUP_MAX_SCALE = 1.2;
 const AI_DEFAULT_BASE_URL = {
   openai: 'https://api.openai.com',
   anthropic: 'https://api.anthropic.com'
@@ -65,7 +57,6 @@ const AI_CUSTOM_MODEL_VALUE = '__custom__';
 
 // === Init ===
 async function init() {
-  await loadPopupSize();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   currentTabId = tab?.id;
 
@@ -85,79 +76,6 @@ async function init() {
   await refreshStatus();
   await refreshRequests();
   startAutoRefresh();
-}
-
-async function loadPopupSize() {
-  const data = await chrome.storage.local.get(UI_SIZE_KEY);
-  const saved = data[UI_SIZE_KEY] || {};
-  const savedScale = Number(saved.scale);
-  const safeScale = saved.version === UI_SIZE_VERSION &&
-    Number.isFinite(savedScale) &&
-    savedScale >= POPUP_MIN_SCALE &&
-    savedScale <= POPUP_MAX_SCALE
-    ? savedScale
-    : 1;
-  applyPopupScale(safeScale);
-  if (safeScale !== savedScale || saved.version !== UI_SIZE_VERSION) {
-    await chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: safeScale, version: UI_SIZE_VERSION } });
-  }
-}
-
-function clampPopupScale(scale) {
-  return Math.min(POPUP_MAX_SCALE, Math.max(POPUP_MIN_SCALE, scale || 1));
-}
-
-function applyPopupScale(scale) {
-  const nextScale = clampPopupScale(scale);
-  const width = `${Math.round(POPUP_BASE_WIDTH * nextScale)}px`;
-  const height = `${Math.round(POPUP_BASE_HEIGHT * nextScale)}px`;
-  [document.documentElement, document.body, appShell].forEach(el => {
-    if (!el) return;
-    el.style.width = width;
-    el.style.height = height;
-    el.style.minWidth = width;
-    el.style.minHeight = height;
-  });
-  const label = `拖拽缩放窗口（${Math.round(nextScale * 100)}%）`;
-  popupResizeHandles.forEach(handle => {
-    handle.title = label;
-    handle.setAttribute('aria-label', label);
-  });
-}
-
-function startPopupResize(e) {
-  e.preventDefault();
-  const corner = e.currentTarget.dataset.corner || 'br';
-  if (e.detail >= 2) {
-    applyPopupScale(1);
-    chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: 1, version: UI_SIZE_VERSION } });
-    return;
-  }
-  const startX = e.clientX;
-  const startY = e.clientY;
-  const startWidth = document.documentElement.clientWidth || POPUP_BASE_WIDTH;
-  const startScale = startWidth / POPUP_BASE_WIDTH;
-  document.documentElement.classList.add('popup-resizing');
-
-  const onMove = (moveEvent) => {
-    const dx = moveEvent.clientX - startX;
-    const dy = moveEvent.clientY - startY;
-    const sx = corner.includes('l') ? -1 : 1;
-    const sy = corner.includes('t') ? -1 : 1;
-    const delta = Math.max((sx * dx) / POPUP_BASE_WIDTH, (sy * dy) / POPUP_BASE_HEIGHT);
-    applyPopupScale(startScale + delta);
-  };
-
-  const onUp = async () => {
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
-    document.documentElement.classList.remove('popup-resizing');
-    const scale = (document.documentElement.clientWidth || POPUP_BASE_WIDTH) / POPUP_BASE_WIDTH;
-    await chrome.storage.local.set({ [UI_SIZE_KEY]: { scale: clampPopupScale(scale), version: UI_SIZE_VERSION } });
-  };
-
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onUp);
 }
 
 // === Messaging ===
@@ -384,7 +302,6 @@ aiSaveBtn.addEventListener('click', async () => {
 });
 aiLoadModelsBtn.addEventListener('click', loadAIModels);
 aiModel.addEventListener('change', updateCustomModelVisibility);
-popupResizeHandles.forEach(handle => handle.addEventListener('mousedown', startPopupResize));
 aiCopyBtn.addEventListener('click', async () => {
   if (!latestAIAnalysis) return;
   try {
