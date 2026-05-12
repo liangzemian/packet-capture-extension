@@ -408,7 +408,7 @@ AI 配置保存在本机浏览器的 `chrome.storage.local`。请勿在不可信
 
 欢迎加入技术交流群，交流 Chrome Extension、CDP 抓包、AI 解读、自动化测试和接口分析相关经验。
 
-![技术交流群](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/%E5%BE%AE%E4%BF%A1%E5%9B%BE%E7%89%87_20260501235133_120_6.jpg)
+![技术交流群](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/20260510204801_139_6.jpg)
 
 ## 作者联系
 
@@ -417,7 +417,7 @@ AI 配置保存在本机浏览器的 `chrome.storage.local`。请勿在不可信
 - 微信: `laohaibao2025`
 - 邮箱: `75271002@qq.com`
 
-![作者微信](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Obsidian/20260510204801_139_6.jpg)
+![作者微信](https://mypicture-1258720957.cos.ap-nanjing.myqcloud.com/Screenshot_20260123_095617_com.tencent.mm.jpg)
 
 ## 打赏
 
