@@ -33,6 +33,7 @@ const aiRunBtn = $('aiRunBtn');
 const aiCopyBtn = $('aiCopyBtn');
 const aiStatus = $('aiStatus');
 const aiResult = $('aiResult');
+const popupResizeBtn = $('popupResizeBtn');
 
 let capturing = false;
 let currentTabId = null;
@@ -45,6 +46,8 @@ let aiLoading = false;
 let latestAIAnalysis = '';
 
 const AI_CONFIG_KEY = 'aiConfig';
+const UI_SIZE_KEY = 'popupSize';
+const UI_SIZE_EXPANDED = 'expanded';
 const AI_DEFAULT_BASE_URL = {
   openai: 'https://api.openai.com',
   anthropic: 'https://api.anthropic.com'
@@ -57,6 +60,7 @@ const AI_CUSTOM_MODEL_VALUE = '__custom__';
 
 // === Init ===
 async function init() {
+  await loadPopupSize();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   currentTabId = tab?.id;
 
@@ -76,6 +80,24 @@ async function init() {
   await refreshStatus();
   await refreshRequests();
   startAutoRefresh();
+}
+
+async function loadPopupSize() {
+  const data = await chrome.storage.local.get(UI_SIZE_KEY);
+  applyPopupSize(data[UI_SIZE_KEY] === UI_SIZE_EXPANDED);
+}
+
+function applyPopupSize(expanded) {
+  document.documentElement.classList.toggle('popup-expanded', expanded);
+  popupResizeBtn.textContent = expanded ? '↙' : '↗';
+  popupResizeBtn.title = expanded ? '缩小窗口' : '扩大窗口';
+  popupResizeBtn.setAttribute('aria-label', expanded ? '缩小窗口' : '扩大窗口');
+}
+
+async function togglePopupSize() {
+  const expanded = !document.documentElement.classList.contains('popup-expanded');
+  applyPopupSize(expanded);
+  await chrome.storage.local.set({ [UI_SIZE_KEY]: expanded ? UI_SIZE_EXPANDED : 'compact' });
 }
 
 // === Messaging ===
@@ -302,6 +324,7 @@ aiSaveBtn.addEventListener('click', async () => {
 });
 aiLoadModelsBtn.addEventListener('click', loadAIModels);
 aiModel.addEventListener('change', updateCustomModelVisibility);
+popupResizeBtn.addEventListener('click', togglePopupSize);
 aiCopyBtn.addEventListener('click', async () => {
   if (!latestAIAnalysis) return;
   try {
